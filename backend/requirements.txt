@@ -1,0 +1,16 @@
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+# pysnmp 4.x is pinned (not the asyncio-only 6.x rewrite): it keeps the
+# synchronous SnmpEngine/getCmd/nextCmd client API and the CommandResponder
+# agent API that both the poller and the simulator rely on. Requires the
+# older pyasn1 0.4.x line (pyasn1.compat.octets was removed in 0.5).
+pysnmp==4.4.12
+pyasn1==0.4.8
+pyasn1-modules==0.2.8
+pysmi==0.3.4
+APScheduler==3.10.4
+itsdangerous==2.1.2
+python-multipart==0.0.9
+pydantic==2.6.4
+pydantic-settings==2.2.1
+bcrypt==4.1.2

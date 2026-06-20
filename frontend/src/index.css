@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dark theme base */
+body {
+  @apply bg-surface text-slate-200 font-sans antialiased;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-surface;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-surface-hover rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-600;
+}
+
+/* Utility classes */
+.card {
+  @apply bg-surface-card border border-surface-border rounded-xl p-5;
+}
+
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+.badge-critical { @apply bg-red-500/20 text-red-400; }
+.badge-warning  { @apply bg-amber-500/20 text-amber-400; }
+.badge-info     { @apply bg-blue-500/20 text-blue-400; }
+.badge-up       { @apply bg-emerald-500/20 text-emerald-400; }
+.badge-down     { @apply bg-red-500/20 text-red-400; }
+
+/* Recharts overrides for dark theme */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #334155;
+}
+.recharts-text {
+  fill: #94a3b8;
+}
+.recharts-tooltip-wrapper {
+  outline: none;
+}
