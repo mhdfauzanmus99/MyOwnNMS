@@ -17,10 +17,6 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     headers: { "Content-Type": "application/json", ...opts.headers },
     ...opts,
   });
-  if (res.status === 401) {
-    window.location.href = "/login";
-    throw new ApiError(401, "Not authenticated");
-  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
     throw new ApiError(res.status, body.detail || res.statusText);
