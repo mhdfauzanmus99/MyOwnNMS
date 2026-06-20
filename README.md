@@ -74,6 +74,59 @@ Then open **http://localhost:5173**.
 | Backend API | http://localhost:8000 | Swagger docs at `/docs` |
 | SNMP simulator | UDP :1161/:1162/:1163 | community `public`, SNMPv2c |
 
+## Run With Docker
+
+Docker builds the React frontend and serves it from FastAPI, so production only
+needs one container. SQLite data is stored in the host `data/` directory.
+
+```bash
+docker compose up -d --build
+```
+
+Then open **http://localhost:8000**.
+
+Create a local `.env` file before first boot if you want non-default secrets:
+
+```bash
+NMS_SECRET_KEY=replace-with-a-long-random-string
+NMS_ADMIN_USERNAME=admin
+NMS_ADMIN_PASSWORD=change-me
+NMS_SIMULATOR=0
+```
+
+Set `NMS_SIMULATOR=1` only when you want the three fake SNMP devices exposed on
+UDP 1161-1163. For real devices, keep it off and add devices in the UI.
+
+## Migrate Mac To Ubuntu With Docker
+
+On the Mac, stop the app first so SQLite checkpoints cleanly:
+
+```bash
+# from the project root
+tar --exclude='.venv' \
+    --exclude='frontend/node_modules' \
+    --exclude='frontend/dist' \
+    -czf netpulse-migrate.tgz .
+scp netpulse-migrate.tgz ubuntu@YOUR_UBUNTU_IP:~
+```
+
+On Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install -y docker.io docker-compose-plugin
+sudo usermod -aG docker "$USER"
+# log out and back in after usermod
+
+mkdir -p ~/netpulse
+tar -xzf ~/netpulse-migrate.tgz -C ~/netpulse
+cd ~/netpulse
+docker compose up -d --build
+```
+
+Open `http://YOUR_UBUNTU_IP:8000`. If you monitor real network devices, allow the
+Ubuntu server IP in each device's SNMP ACL/community configuration.
+
 ---
 
 ## What it monitors

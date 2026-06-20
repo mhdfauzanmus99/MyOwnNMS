@@ -1,0 +1,21 @@
+services:
+  netpulse:
+    build: .
+    image: netpulse-nms:local
+    container_name: netpulse-nms
+    restart: unless-stopped
+    environment:
+      NMS_HOST: 0.0.0.0
+      NMS_PORT: 8000
+      NMS_SECRET_KEY: ${NMS_SECRET_KEY:-change-this-long-random-secret}
+      NMS_ADMIN_USERNAME: ${NMS_ADMIN_USERNAME:-admin}
+      NMS_ADMIN_PASSWORD: ${NMS_ADMIN_PASSWORD:-admin}
+      NMS_POLL_INTERVAL: ${NMS_POLL_INTERVAL:-60}
+      NMS_SIMULATOR: ${NMS_SIMULATOR:-0}
+    ports:
+      - "8000:8000"
+      - "1161:1161/udp"
+      - "1162:1162/udp"
+      - "1163:1163/udp"
+    volumes:
+      - ./data:/app/data
