@@ -135,6 +135,16 @@ export interface DashboardData {
   devices: { up: number; down: number; unknown: number; total: number };
   interfaces: { up: number; down: number; total: number };
   open_alerts: number;
+  availability_devices: Array<{
+    id: number;
+    name: string;
+    hostname: string;
+    port: number;
+    status: string;
+    last_polled: string | null;
+    reason: string | null;
+    open_alerts: number;
+  }>;
   top_interfaces: Array<{
     interface_id: number; interface_name: string;
     device_id: number; device_name: string;

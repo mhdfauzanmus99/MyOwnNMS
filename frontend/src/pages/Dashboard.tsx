@@ -5,6 +5,80 @@ import { useSSE, type SSEAlert } from "../hooks";
 import { StatCard, SeverityBadge, StatusDot, ToastContainer } from "../components/UI";
 import { Server, Wifi, WifiOff, AlertTriangle, RefreshCw } from "lucide-react";
 
+function mapState(device: api.DashboardData["availability_devices"][number]) {
+  if (device.status === "down") return "down";
+  if (device.status === "unknown" || device.open_alerts > 0) return "warn";
+  return "up";
+}
+
+function AvailabilityMap({ data }: { data: api.DashboardData }) {
+  const hostCounts = data.availability_devices.reduce(
+    (acc, device) => {
+      acc[mapState(device)] += 1;
+      return acc;
+    },
+    { up: 0, warn: 0, down: 0 }
+  );
+  const ifaceWarn = Math.max(data.interfaces.total - data.interfaces.up - data.interfaces.down, 0);
+
+  const badgeClass = {
+    up: "bg-emerald-500 text-white",
+    warn: "bg-amber-500 text-white",
+    down: "bg-red-500 text-white",
+  };
+
+  return (
+    <section className="card p-0 overflow-hidden">
+      <div className="bg-black px-5 py-3">
+        <h2 className="text-center text-lg font-semibold text-white">Availability Map</h2>
+      </div>
+      <div className="p-5 space-y-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-lg font-semibold text-white mr-1">Total hosts</span>
+            <span className="badge badge-up">up: {hostCounts.up}</span>
+            <span className="badge badge-warning">warn: {hostCounts.warn}</span>
+            <span className="badge badge-down">down: {hostCounts.down}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-lg font-semibold text-white mr-1">Total interfaces</span>
+            <span className="badge badge-up">up: {data.interfaces.up}</span>
+            <span className="badge badge-warning">warn: {ifaceWarn}</span>
+            <span className="badge badge-down">down: {data.interfaces.down}</span>
+          </div>
+        </div>
+
+        {data.availability_devices.length === 0 ? (
+          <p className="text-sm text-slate-500">No enabled devices yet.</p>
+        ) : (
+          <div className="flex max-h-[280px] flex-wrap content-start gap-2 overflow-y-auto pr-1">
+            {data.availability_devices.map((device) => {
+              const state = mapState(device);
+              const title = [
+                `${device.name} (${device.hostname}:${device.port})`,
+                `status: ${device.status}`,
+                `open alerts: ${device.open_alerts}`,
+                device.reason ? `reason: ${device.reason}` : "",
+              ].filter(Boolean).join("\n");
+              return (
+                <Link
+                  key={device.id}
+                  to={`/devices/${device.id}`}
+                  title={title}
+                  className={`max-w-full truncate rounded px-2.5 py-1 text-sm font-semibold leading-5 shadow-sm transition-opacity hover:opacity-85 ${badgeClass[state]}`}
+                >
+                  {device.name}
+                  {device.open_alerts > 0 ? ` (${device.open_alerts})` : ""}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function DashboardPage() {
   const [data, setData] = useState<api.DashboardData | null>(null);
   const [toasts, setToasts] = useState<{ id: number; severity: string; message: string }[]>([]);
@@ -55,6 +129,8 @@ export function DashboardPage() {
         <StatCard label="Interfaces Up" value={i.up} icon={<Wifi className="w-6 h-6 text-blue-400" />} color="bg-blue-500/15" />
         <StatCard label="Open Alerts" value={data.open_alerts} icon={<AlertTriangle className="w-6 h-6 text-amber-400" />} color="bg-amber-500/15" />
       </div>
+
+      <AvailabilityMap data={data} />
 
       {/* Top interfaces + recent alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

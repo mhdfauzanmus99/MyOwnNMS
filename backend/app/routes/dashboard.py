@@ -1,4 +1,4 @@
-"""Dashboard aggregation: summary counts + top utilised interfaces."""
+"""Dashboard aggregation: summary counts + availability map + top interfaces."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -32,6 +32,25 @@ def dashboard(_user=Depends(require_user)) -> dict:
         "SELECT COUNT(*) AS n FROM alerts WHERE resolved_at IS NULL"
     )[0]["n"]
 
+    availability_devices = database.query(
+        """SELECT *
+           FROM (
+             SELECT d.id, d.name, d.hostname, d.port, d.status, d.last_polled, d.reason,
+                    (SELECT COUNT(*) FROM alerts a WHERE a.device_id=d.id AND a.resolved_at IS NULL)
+                      AS open_alerts
+             FROM devices d
+             WHERE d.enabled=1
+           )
+           ORDER BY
+             CASE
+               WHEN status='down' THEN 0
+               WHEN status='unknown' THEN 1
+               WHEN open_alerts > 0 THEN 2
+               ELSE 3
+             END,
+             name"""
+    )
+
     # Top utilised interfaces by latest sample (peak of in/out).
     top = database.query(
         """SELECT m.in_pct, m.out_pct, m.in_bps, m.out_bps, m.ts,
@@ -58,6 +77,7 @@ def dashboard(_user=Depends(require_user)) -> dict:
         "devices": device_counts,
         "interfaces": iface_counts,
         "open_alerts": open_alerts,
+        "availability_devices": availability_devices,
         "top_interfaces": top,
         "recent_alerts": recent_alerts,
     }
