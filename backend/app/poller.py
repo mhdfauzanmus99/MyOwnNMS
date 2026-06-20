@@ -16,9 +16,22 @@ from pysnmp.hlapi import (
     ObjectType,
     ObjectIdentity,
     SnmpEngine,
+    UsmUserData,
     UdpTransportTarget,
     nextCmd,
     getCmd,
+    usmAesCfb128Protocol,
+    usmAesCfb192Protocol,
+    usmAesCfb256Protocol,
+    usmDESPrivProtocol,
+    usmHMAC128SHA224AuthProtocol,
+    usmHMAC192SHA256AuthProtocol,
+    usmHMAC256SHA384AuthProtocol,
+    usmHMAC384SHA512AuthProtocol,
+    usmHMACMD5AuthProtocol,
+    usmHMACSHAAuthProtocol,
+    usmNoAuthProtocol,
+    usmNoPrivProtocol,
 )
 
 from . import alerts, database, oids
@@ -39,11 +52,70 @@ def _transport(device: dict) -> UdpTransportTarget:
     )
 
 
-def _community(device: dict) -> CommunityData:
+_AUTH_PROTOCOLS = {
+    "none": usmNoAuthProtocol,
+    "md5": usmHMACMD5AuthProtocol,
+    "sha": usmHMACSHAAuthProtocol,
+    "sha224": usmHMAC128SHA224AuthProtocol,
+    "sha256": usmHMAC192SHA256AuthProtocol,
+    "sha384": usmHMAC256SHA384AuthProtocol,
+    "sha512": usmHMAC384SHA512AuthProtocol,
+}
+
+_PRIV_PROTOCOLS = {
+    "none": usmNoPrivProtocol,
+    "des": usmDESPrivProtocol,
+    "aes": usmAesCfb128Protocol,
+    "aes128": usmAesCfb128Protocol,
+    "aes192": usmAesCfb192Protocol,
+    "aes256": usmAesCfb256Protocol,
+}
+
+
+def _security_data(device: dict):
     version = (device.get("snmp_version") or "2c").lower()
-    # mpModel: 0=SNMPv1, 1=SNMPv2c, 3=SNMPv3
+    if version in {"3", "v3", "snmpv3"}:
+        username = (device.get("snmpv3_username") or "").strip()
+        if not username:
+            raise RuntimeError("SNMPv3 username is required")
+
+        security_level = (device.get("snmpv3_security_level") or "noAuthNoPriv").strip()
+        auth_protocol_name = (device.get("snmpv3_auth_protocol") or "none").lower()
+        priv_protocol_name = (device.get("snmpv3_priv_protocol") or "none").lower()
+        auth_key = device.get("snmpv3_auth_password") or None
+        priv_key = device.get("snmpv3_priv_password") or None
+
+        if security_level in {"authNoPriv", "authPriv"} and not auth_key:
+            raise RuntimeError("SNMPv3 auth password is required")
+        if security_level == "authPriv" and not priv_key:
+            raise RuntimeError("SNMPv3 privacy password is required")
+        if security_level == "noAuthNoPriv":
+            auth_protocol_name = "none"
+            priv_protocol_name = "none"
+            auth_key = None
+            priv_key = None
+        elif security_level == "authNoPriv":
+            priv_protocol_name = "none"
+            priv_key = None
+
+        return UsmUserData(
+            username,
+            authKey=auth_key,
+            privKey=priv_key,
+            authProtocol=_AUTH_PROTOCOLS.get(auth_protocol_name, usmHMACSHAAuthProtocol),
+            privProtocol=_PRIV_PROTOCOLS.get(priv_protocol_name, usmAesCfb128Protocol),
+        )
+
+    # mpModel: 0=SNMPv1, 1=SNMPv2c
     mp = 0 if version == "1" else 1
     return CommunityData(device.get("community") or "public", mpModel=mp)
+
+
+def _context(device: dict) -> ContextData:
+    context_name = device.get("snmpv3_context_name")
+    if (device.get("snmp_version") or "").lower() in {"3", "v3", "snmpv3"} and context_name:
+        return ContextData(contextName=str(context_name))
+    return ContextData()
 
 
 def _walk(oid: str, device: dict) -> dict[int, object]:
@@ -51,9 +123,9 @@ def _walk(oid: str, device: dict) -> dict[int, object]:
     results: dict[int, object] = {}
     it = nextCmd(
         SnmpEngine(),
-        _community(device),
+        _security_data(device),
         _transport(device),
-        ContextData(),
+        _context(device),
         ObjectType(ObjectIdentity(oid)),
         lexicographicMode=False,
     )
@@ -77,9 +149,9 @@ def _get_scalar(oid: str, device: dict) -> Optional[object]:
     """Single GET for a scalar (.0) OID."""
     gen = getCmd(
         SnmpEngine(),
-        _community(device),
+        _security_data(device),
         _transport(device),
-        ContextData(),
+        _context(device),
         ObjectType(ObjectIdentity(oid)),
     )
     error_indication, error_status, error_index, var_binds = next(gen)

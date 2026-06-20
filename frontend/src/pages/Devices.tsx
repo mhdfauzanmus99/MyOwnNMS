@@ -5,12 +5,30 @@ import type { Device } from "../api";
 import { StatusDot, StatusBadge, EmptyState } from "../components/UI";
 import { Plus, Trash2, RefreshCw, X } from "lucide-react";
 
+const emptyDeviceForm = {
+  name: "",
+  hostname: "",
+  port: 161,
+  community: "public",
+  snmp_version: "2c",
+  snmpv3_username: "",
+  snmpv3_security_level: "noAuthNoPriv",
+  snmpv3_auth_protocol: "sha",
+  snmpv3_auth_password: "",
+  snmpv3_priv_protocol: "aes128",
+  snmpv3_priv_password: "",
+  snmpv3_context_name: "",
+};
+
 export function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", hostname: "", port: 161, community: "public", snmp_version: "2c" });
+  const [form, setForm] = useState(emptyDeviceForm);
   const [adding, setAdding] = useState(false);
+  const isV3 = form.snmp_version === "3";
+  const needsAuth = isV3 && form.snmpv3_security_level !== "noAuthNoPriv";
+  const needsPriv = isV3 && form.snmpv3_security_level === "authPriv";
 
   const load = useCallback(async () => {
     try { setDevices(await api.listDevices()); }
@@ -25,7 +43,7 @@ export function DevicesPage() {
     try {
       await api.createDevice(form);
       setShowAdd(false);
-      setForm({ name: "", hostname: "", port: 161, community: "public", snmp_version: "2c" });
+      setForm(emptyDeviceForm);
       load();
     } catch (err: any) {
       alert(err.message);
@@ -123,18 +141,58 @@ export function DevicesPage() {
             <div className="space-y-3">
               <input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
               <input placeholder="Hostname / IP" value={form.hostname} onChange={(e) => setForm({ ...form, hostname: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
-              <div className="grid grid-cols-2 gap-3">
-                <input type="number" placeholder="Port" value={form.port} onChange={(e) => setForm({ ...form, port: +e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
-                <input placeholder="Community" value={form.community} onChange={(e) => setForm({ ...form, community: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
-              </div>
               <select value={form.snmp_version} onChange={(e) => setForm({ ...form, snmp_version: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
                 <option value="2c">SNMPv2c</option>
                 <option value="1">SNMPv1</option>
+                <option value="3">SNMPv3</option>
               </select>
+              <div className="grid grid-cols-2 gap-3">
+                <input type="number" placeholder="Port" value={form.port} onChange={(e) => setForm({ ...form, port: +e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                {!isV3 && (
+                  <input placeholder="Community" value={form.community} onChange={(e) => setForm({ ...form, community: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                )}
+                {isV3 && (
+                  <input placeholder="Context name" value={form.snmpv3_context_name} onChange={(e) => setForm({ ...form, snmpv3_context_name: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                )}
+              </div>
+              {isV3 && (
+                <div className="space-y-3 border-t border-surface-border pt-3">
+                  <input placeholder="SNMPv3 username" value={form.snmpv3_username} onChange={(e) => setForm({ ...form, snmpv3_username: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  <select value={form.snmpv3_security_level} onChange={(e) => setForm({ ...form, snmpv3_security_level: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+                    <option value="noAuthNoPriv">No auth, no privacy</option>
+                    <option value="authNoPriv">Auth, no privacy</option>
+                    <option value="authPriv">Auth and privacy</option>
+                  </select>
+                  {needsAuth && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <select value={form.snmpv3_auth_protocol} onChange={(e) => setForm({ ...form, snmpv3_auth_protocol: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+                        <option value="sha">SHA</option>
+                        <option value="sha224">SHA-224</option>
+                        <option value="sha256">SHA-256</option>
+                        <option value="sha384">SHA-384</option>
+                        <option value="sha512">SHA-512</option>
+                        <option value="md5">MD5</option>
+                      </select>
+                      <input type="password" placeholder="Auth password" value={form.snmpv3_auth_password} onChange={(e) => setForm({ ...form, snmpv3_auth_password: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                    </div>
+                  )}
+                  {needsPriv && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <select value={form.snmpv3_priv_protocol} onChange={(e) => setForm({ ...form, snmpv3_priv_protocol: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+                        <option value="aes128">AES-128</option>
+                        <option value="aes192">AES-192</option>
+                        <option value="aes256">AES-256</option>
+                        <option value="des">DES</option>
+                      </select>
+                      <input type="password" placeholder="Privacy password" value={form.snmpv3_priv_password} onChange={(e) => setForm({ ...form, snmpv3_priv_password: e.target.value })} className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setShowAdd(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-white rounded-lg transition-colors">Cancel</button>
-              <button onClick={handleAdd} disabled={adding || !form.name || !form.hostname} className="px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg transition-colors">
+              <button onClick={handleAdd} disabled={adding || !form.name || !form.hostname || (isV3 && !form.snmpv3_username) || (needsAuth && !form.snmpv3_auth_password) || (needsPriv && !form.snmpv3_priv_password)} className="px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg transition-colors">
                 {adding ? "Adding…" : "Add Device"}
               </button>
             </div>

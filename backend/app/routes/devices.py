@@ -18,6 +18,13 @@ class DeviceIn(BaseModel):
     port: int = 161
     community: str = "public"
     snmp_version: str = Field(default="2c")
+    snmpv3_username: Optional[str] = None
+    snmpv3_security_level: str = "noAuthNoPriv"
+    snmpv3_auth_protocol: str = "none"
+    snmpv3_auth_password: Optional[str] = None
+    snmpv3_priv_protocol: str = "none"
+    snmpv3_priv_password: Optional[str] = None
+    snmpv3_context_name: Optional[str] = None
     enabled: bool = True
 
 
@@ -27,7 +34,31 @@ class DevicePatch(BaseModel):
     port: Optional[int] = None
     community: Optional[str] = None
     snmp_version: Optional[str] = None
+    snmpv3_username: Optional[str] = None
+    snmpv3_security_level: Optional[str] = None
+    snmpv3_auth_protocol: Optional[str] = None
+    snmpv3_auth_password: Optional[str] = None
+    snmpv3_priv_protocol: Optional[str] = None
+    snmpv3_priv_password: Optional[str] = None
+    snmpv3_context_name: Optional[str] = None
     enabled: Optional[bool] = None
+
+
+def _validate_snmp(body: DeviceIn | DevicePatch) -> None:
+    version = (body.snmp_version or "").lower() if body.snmp_version is not None else ""
+    if version not in {"3", "v3", "snmpv3"}:
+        return
+
+    if not getattr(body, "snmpv3_username", None):
+        raise HTTPException(status_code=400, detail="SNMPv3 username is required")
+
+    level = getattr(body, "snmpv3_security_level", None) or "noAuthNoPriv"
+    if level not in {"noAuthNoPriv", "authNoPriv", "authPriv"}:
+        raise HTTPException(status_code=400, detail="Invalid SNMPv3 security level")
+    if level in {"authNoPriv", "authPriv"} and not getattr(body, "snmpv3_auth_password", None):
+        raise HTTPException(status_code=400, detail="SNMPv3 auth password is required")
+    if level == "authPriv" and not getattr(body, "snmpv3_priv_password", None):
+        raise HTTPException(status_code=400, detail="SNMPv3 privacy password is required")
 
 
 @router.get("")
@@ -43,10 +74,21 @@ def list_devices(_user=Depends(require_user)) -> list[dict]:
 
 @router.post("")
 def create_device(body: DeviceIn, _user=Depends(require_user)) -> dict:
+    _validate_snmp(body)
     dev_id = database.execute(
-        """INSERT INTO devices (name, hostname, port, community, snmp_version, enabled)
-           VALUES (?,?,?,?,?,?)""",
-        (body.name, body.hostname, body.port, body.community, body.snmp_version, int(body.enabled)),
+        """INSERT INTO devices (
+              name, hostname, port, community, snmp_version,
+              snmpv3_username, snmpv3_security_level, snmpv3_auth_protocol,
+              snmpv3_auth_password, snmpv3_priv_protocol, snmpv3_priv_password,
+              snmpv3_context_name, enabled
+           )
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            body.name, body.hostname, body.port, body.community, body.snmp_version,
+            body.snmpv3_username, body.snmpv3_security_level, body.snmpv3_auth_protocol,
+            body.snmpv3_auth_password, body.snmpv3_priv_protocol, body.snmpv3_priv_password,
+            body.snmpv3_context_name, int(body.enabled),
+        ),
     )
     # Trigger an immediate poll so the new device appears populated.
     scheduler.poll_now()
@@ -63,6 +105,7 @@ def get_device(device_id: int, _user=Depends(require_user)) -> dict:
 
 @router.patch("/{device_id}")
 def patch_device(device_id: int, body: DevicePatch, _user=Depends(require_user)) -> dict:
+    _validate_snmp(body)
     fields, vals = [], []
     for k, v in body.dict(exclude_none=True).items():
         fields.append(f"{k}=?")

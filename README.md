@@ -142,8 +142,17 @@ Ubuntu server IP in each device's SNMP ACL/community configuration.
 
 ## Adding a real device
 
-In the UI: **Devices → Add Device** → enter name, IP/hostname, port (161), community
-(`public`), SNMP version (2c). Or against the API:
+In the UI: **Devices → Add Device** → enter name, IP/hostname, port, and SNMP
+credentials. SNMPv1/v2c uses a community string. SNMPv3 supports:
+
+- `noAuthNoPriv`
+- `authNoPriv`
+- `authPriv`
+
+Supported SNMPv3 auth protocols: MD5, SHA, SHA-224, SHA-256, SHA-384, SHA-512.
+Supported privacy protocols: DES, AES-128, AES-192, AES-256.
+
+SNMPv2c API example:
 
 ```bash
 curl -X POST http://localhost:8000/api/devices \
@@ -152,7 +161,28 @@ curl -X POST http://localhost:8000/api/devices \
   -d '{"name":"Core-SW","hostname":"192.168.1.1","port":161,"community":"public","snmp_version":"2c"}'
 ```
 
-For a real switch, enable SNMP and allow your Mac's IP in the device's community ACL.
+SNMPv3 API example:
+
+```bash
+curl -X POST http://localhost:8000/api/devices \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "name":"Core-SW-v3",
+    "hostname":"192.168.1.1",
+    "port":161,
+    "snmp_version":"3",
+    "snmpv3_username":"nmsuser",
+    "snmpv3_security_level":"authPriv",
+    "snmpv3_auth_protocol":"sha",
+    "snmpv3_auth_password":"auth-password",
+    "snmpv3_priv_protocol":"aes128",
+    "snmpv3_priv_password":"privacy-password"
+  }'
+```
+
+For a real switch, enable SNMP and allow the NMS server IP in the device's SNMP
+ACL/community/user configuration.
 
 ---
 

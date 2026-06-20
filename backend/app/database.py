@@ -56,6 +56,13 @@ CREATE TABLE IF NOT EXISTS devices (
     port         INTEGER NOT NULL DEFAULT 161,
     community    TEXT NOT NULL DEFAULT 'public',
     snmp_version TEXT NOT NULL DEFAULT '2c',
+    snmpv3_username      TEXT,
+    snmpv3_security_level TEXT NOT NULL DEFAULT 'noAuthNoPriv',
+    snmpv3_auth_protocol  TEXT NOT NULL DEFAULT 'none',
+    snmpv3_auth_password  TEXT,
+    snmpv3_priv_protocol  TEXT NOT NULL DEFAULT 'none',
+    snmpv3_priv_password  TEXT,
+    snmpv3_context_name   TEXT,
     enabled      INTEGER NOT NULL DEFAULT 1,
     status       TEXT NOT NULL DEFAULT 'unknown',   -- up | down | unknown
     sysname      TEXT,
@@ -132,6 +139,30 @@ CREATE INDEX IF NOT EXISTS idx_alerts_open ON alerts(device_id, interface_id, ty
 def init_schema() -> None:
     with get_conn() as conn, _write_lock:
         conn.executescript(SCHEMA)
+        _migrate_schema(conn)
+
+
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Apply additive migrations for existing SQLite databases."""
+    device_columns = {row["name"] for row in conn.execute("PRAGMA table_info(devices)")}
+    migrations = {
+        "snmpv3_username": "ALTER TABLE devices ADD COLUMN snmpv3_username TEXT",
+        "snmpv3_security_level": (
+            "ALTER TABLE devices ADD COLUMN snmpv3_security_level TEXT NOT NULL DEFAULT 'noAuthNoPriv'"
+        ),
+        "snmpv3_auth_protocol": (
+            "ALTER TABLE devices ADD COLUMN snmpv3_auth_protocol TEXT NOT NULL DEFAULT 'none'"
+        ),
+        "snmpv3_auth_password": "ALTER TABLE devices ADD COLUMN snmpv3_auth_password TEXT",
+        "snmpv3_priv_protocol": (
+            "ALTER TABLE devices ADD COLUMN snmpv3_priv_protocol TEXT NOT NULL DEFAULT 'none'"
+        ),
+        "snmpv3_priv_password": "ALTER TABLE devices ADD COLUMN snmpv3_priv_password TEXT",
+        "snmpv3_context_name": "ALTER TABLE devices ADD COLUMN snmpv3_context_name TEXT",
+    }
+    for column, sql in migrations.items():
+        if column not in device_columns:
+            conn.execute(sql)
 
 
 # ---------------------------------------------------------------------------

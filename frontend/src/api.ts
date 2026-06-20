@@ -41,6 +41,13 @@ export interface Device {
   port: number;
   community: string;
   snmp_version: string;
+  snmpv3_username: string | null;
+  snmpv3_security_level: string;
+  snmpv3_auth_protocol: string;
+  snmpv3_auth_password: string | null;
+  snmpv3_priv_protocol: string;
+  snmpv3_priv_password: string | null;
+  snmpv3_context_name: string | null;
   enabled: number;
   status: string;
   sysname: string | null;
